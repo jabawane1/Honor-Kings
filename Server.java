@@ -2,240 +2,247 @@ import java.util.*;
 import java.net.*;
 import java.io.*;
 
-class Server {
-    private class Card implements Serializable{
-        String value;
-        String type;
+class Server{
+    private ServerSocket serverSocket;
 
-        Card(String value, String type){
-            this.value = value;
-            this.type = type;
-        }
+    private Socket[] ClientSocks = new Socket[4];
+    private String[] ClientUsers = new String[4];
 
-        public String toString(){
-            return value + "-" + type;
-        }
-    }
+    private Random random = new Random();
 
-    public ServerSocket serverSocket;
+    private char trumpChar, firstTurn;
+    private String Trump, CommonString;
 
-    static Socket[] ClientSocks = new Socket[4];
-    static String[] ClientUsers = new String[4];
+    private ArrayList<Card> newDeck;
+    private ArrayList<ArrayList<Card>> MainDeck;
 
-    Random random = new Random();
+    private HashMap<Character, Integer> HMap = new HashMap<>();
+    private HashMap<Integer, Integer> pointsTable = new HashMap<>();
 
-    static int Score;
-
-    static char FirstTurn;
-    static char startChar;
-    static char endChar; 
-    
-    static String Trump;
-    static String CommonString;
-
-    static ArrayList<Card> Deck;
-    static ArrayList<ArrayList<Card>> MainDeck;
-    static HashMap<Character, Integer> HMap = new HashMap<>();
-    
-    public void MakeDeck() {
-        Deck = new ArrayList<Card>();
-        String[] Values = {"A","2","3","4","5","6","7","8","9","10","J","Q","K"};
-        String[] Types = {"C","D","H","S"};
-
-        for (int i = 0; i < Types.length; i++){
-            for (int j = 0; j < Values.length; j++){
-                Card card = new Card(Values[j], Types[i]);
-                Deck.add(card);
-            }
-        }
-
-        for (int i = 0; i < Deck.size(); i++){
-            int j = random.nextInt(Deck.size());
-            Card Card1 = Deck.get(i);
-            Card Card2 = Deck.get(j);
-            Deck.set(i, Card2);
-            Deck.set(j, Card1);
-        }
-    }
-
-    public void TrumpCard() {
-        char T = '\0';
-        for (int i = 0; i < 52; i++){
-            String S = Deck.get(i).toString();
-            if(S.charAt(0) == 'J'){
-                int L = S.length(); 
-                T = S.charAt(L - 1);
-                break;
-            }
-        }
-
-        HashMap<Character, String> Suit = new HashMap<>();
-        Suit.put('C', " Club");
-        Suit.put('D', " Diamond");
-        Suit.put('H', " Heart");
-        Suit.put('S', " Spade");
-
-        String TrumpLine = "\nTrump Card of Game :";
-        Trump = Suit.get(T);
-        TrumpLine += Trump;
-            
-        System.out.print(TrumpLine + "\n");
-    }
-
-    public void DivideDeck() {
+    public void sendDeck(){
         MainDeck = new ArrayList<>();
-        ArrayList<Card> TempDeck = new ArrayList<>(Deck);
-    
-        for (int i = 0; i < 4; i++) {
-            ArrayList<Card> deck = new ArrayList<>();
-    
-            for (int j = 0; j < 13; j++) {
-                int Index = random.nextInt(TempDeck.size());
-                Card card = TempDeck.remove(Index);
-                deck.add(card);
+        ArrayList<Card> deckCopy = new ArrayList<>(newDeck);
+
+        for(int i = 0; i < 4; i++){
+            ArrayList<Card> playerDeck = new ArrayList<>();
+
+            for(int j = 0; j < 13; j++){
+                int index = random.nextInt(deckCopy.size());
+                playerDeck.add(deckCopy.remove(index));
             }
-    
-            MainDeck.add(deck);
+
+            MainDeck.add(playerDeck);
+        }
+
+        for(int j = 0; j < 4; j++){
+            try{
+                ArrayList<String> stringDeck = new ArrayList<>();
+                for(Card card : MainDeck.get(j)) 
+                    stringDeck.add(card.toString());
+
+                BufferedWriter BF = new BufferedWriter(new OutputStreamWriter(ClientSocks[j].getOutputStream()));
+        
+                for(String element : stringDeck){
+                    BF.write(element);
+                    BF.newLine();
+                    BF.flush();
+                }          
+            }catch(IOException e){
+                e.printStackTrace();
+            }
         }
     }
     
-    public void PutHashmap(){
+    public void mapRankValues(){
         for(int i = 2; i <= 10; i++){
-            char c=(char)(i + 48);
-            HMap.put(c,i);
+            char c = (char)(i + 48);
+            HMap.put(c, i);
         }
 
-        HMap.put('J',11);
-        HMap.put('Q',12);
-        HMap.put('K',13);
-        HMap.put('A',14);
+        HMap.put('J', 11);
+        HMap.put('Q', 12);
+        HMap.put('K', 13);
+        HMap.put('A', 14);
     }
 
-    private static String CenterString(String str, int width) {
-        int padding = (width - str.length()) / 2;
-        StringBuilder padded = new StringBuilder();
-        for (int i = 0; i < padding; i++)
-            padded.append(' ');
-        
-        padded.append(str);
-        while (padded.length() < width)
-            padded.append(' ');
-        
-        return padded.toString();
-    }
-    private static void PrintHorizontalLine(int width) {
-        for (int i = 0; i < width; i++)
-            System.out.print("-");
-        
-        System.out.println();
-    }
+    public void sendPlayerNames(){
+        for(int i = 0; i < 4; i++){
+            try{
+                BufferedWriter BW = new BufferedWriter(new OutputStreamWriter(ClientSocks[i].getOutputStream()));
 
-    public static void PrintHashMap(HashMap<Integer, Integer> M) {
-        HashMap<String, Integer> map = new HashMap<>();
+                for(int j = 0; j < 4; j++){
+                    BW.write(i != j ? ClientUsers[j] : "Your New Name " + ClientUsers[j]);
+                    BW.newLine();
+                }
 
-        for (Map.Entry<Integer, Integer> entry : M.entrySet()){
-            String key = ClientUsers[entry.getKey()];
-            map.put(key,entry.getValue());
-        }
+                BW.flush();
 
-        int maxKeyWidth = Math.max(map.keySet().stream().mapToInt(String::length).max().orElse(0), "Name".length());
-        int maxValueWidth = Math.max(map.values().stream().mapToInt(value -> value.toString().length()).max().orElse(0), "Score".length());
-        int TotalWidth = maxKeyWidth + maxValueWidth + 7;
-
-        PrintHorizontalLine(TotalWidth);
-
-        String HeaderKey = CenterString("Name", maxKeyWidth);
-        String HeaderValue = CenterString("Score", maxValueWidth);
-        System.out.println("| " + HeaderKey + " | " + HeaderValue + " |");
-
-        PrintHorizontalLine(TotalWidth);
-
-        for (Map.Entry<String, Integer> entry : map.entrySet()) {
-            String key = entry.getKey();
-            String value = entry.getValue().toString();
-            String paddedKey = CenterString(key, maxKeyWidth);
-            String paddedValue = CenterString(value, maxValueWidth);
-            System.out.println("| " + paddedKey + " | " + paddedValue + " |");
-            PrintHorizontalLine(TotalWidth);
+                pointsTable.put(i, 0);
+            }catch(IOException e){
+                e.printStackTrace();
+            }
         }
     }
 
-    public void SendString(String message){
+    public void sendString(String message){
         try{
-            for (int i = 0; i < 4; i++) {
-                BufferedWriter BF = new BufferedWriter(new OutputStreamWriter(ClientSocks[i].getOutputStream()));
-                BF.write(message);
-                BF.flush();
+            for(int i = 0; i < 4; i++){
+                BufferedWriter BW = new BufferedWriter(new OutputStreamWriter(ClientSocks[i].getOutputStream()));
+                BW.write(message);
+                BW.flush();
             }
         }catch(IOException e){
             e.printStackTrace();
         }
     }
 
-    public int CountScore(String message,char FirstTurn){
-        startChar = message.charAt(0);
-        endChar = message.charAt(message.length() - 1);
+    public void setChar(char C){
+        this.firstTurn = C;
+    }
 
-        if (message.length() == 4){
-            if (endChar == Trump.charAt(0))
-                Score = 110;
-            else if(endChar == FirstTurn)
-                Score = 10;
-            else
-                Score = 0;
+    public int countScore(String message){
+        char startChar = message.charAt(0);
+        char endChar = message.charAt(message.length() - 1);
+
+        int score = 0;
+        if(message.length() == 4){
+            if(endChar == trumpChar)
+                score = 110;
+            else if(endChar == firstTurn)
+                score = 10;
         }else{
-            if (endChar == Trump.charAt(0))
-                Score = 100 + HMap.get(startChar);
-            else if(endChar == FirstTurn)
-                Score = HMap.get(startChar);
-            else
-                Score = 0;
+            if(endChar == trumpChar)
+                score = 100 + HMap.get(startChar);
+            else if(endChar == firstTurn)
+                score = HMap.get(startChar);
         }
 
-        return Score;
+        return score;
     }
 
-    public void CountSubRoundScore(TreeMap<Integer,Integer> TMap,HashMap<Integer,Integer> RoundScore){
-        Integer WinnerKey = TMap.firstKey();
-        Integer WinnerIdx = TMap.get(WinnerKey);
+    Printer PH = new Printer(ClientUsers);
+    public void countSubRoundScore(TreeMap<Integer,Integer> TMap, HashMap<Integer,Integer> roundScore){
+        Integer winnerKey = TMap.firstKey();
+        Integer winnerIdx = TMap.get(winnerKey);
 
-        int Old_Value = RoundScore.get(WinnerIdx);
-        int New_Value = Old_Value + 1;
+        roundScore.put(winnerIdx, roundScore.getOrDefault(winnerIdx, 0) + 1);
 
-        RoundScore.put(WinnerIdx,New_Value);
         System.out.println("\n----- SubRound Score -----\n");
-        PrintHashMap(RoundScore);
+        PH.PrintHashMap(roundScore);
     }
 
-    public void CountRoundScore(HashMap<Integer,Integer> RoundScore,HashMap<Integer,Integer> CommitScore,HashMap<Integer,Integer> PointsTable){
+    public void countRoundScore(HashMap<Integer,Integer> roundScore, HashMap<Integer,Integer> commitScore, HashMap<Integer,Integer> pointsTable){
         for(int j = 0; j < 4; j++){
-            int RS = RoundScore.get(j);
-            int CS = CommitScore.get(j);
+            int RS = roundScore.get(j);
+            int CS = commitScore.get(j);
 
-            if(RS < CS){
-                int Old_Value = PointsTable.get(j);
-                int New_Value = Old_Value + ((-CS)*10);
-                PointsTable.put(j,New_Value);
-            }else{
-                int Old_Value = PointsTable.get(j);
-                int New_Value = Old_Value + ((CS*10) + ((RS-CS)*2));
-                PointsTable.put(j,New_Value);
-            }
+            int newValue = 0;
+            int oldValue = pointsTable.get(j);
+
+            if(RS < CS)
+                newValue = oldValue + ((-CS) * 10);
+            else
+                newValue = oldValue + ((CS * 10) + ((RS - CS) * 2));
+        
+            pointsTable.put(j, newValue);
         }
 
         System.out.println("\n----- Commit Score -----\n");
-        PrintHashMap(CommitScore);
+        PH.PrintHashMap(commitScore);
 
         System.out.println("\n----- Points Table -----\n");
-        PrintHashMap(PointsTable);
+        PH.PrintHashMap(pointsTable);
     }
 
-    public void StartServer(ServerSocket serverSocket){
+    public void collectCommitScores(Map<Integer, Integer> commitScore){
+        for(int j = 0; j < 4; j++){
+            try{
+                BufferedWriter BW = new BufferedWriter(new OutputStreamWriter(ClientSocks[j].getOutputStream()));
+                BW.write("Your Commit");
+                BW.newLine();
+                BW.flush();
+
+                BufferedReader BR = new BufferedReader(new InputStreamReader(ClientSocks[j].getInputStream()));
+
+                String line = BR.readLine();
+                int message = Integer.parseInt(line);
+
+                commitScore.put(j, message);
+
+            }catch(IOException | NumberFormatException e){
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public void startSubRound(HashMap<Integer, Integer> roundScore){
+        for(int j = 0; j < 2; j++){
+            TreeMap<Integer, Integer> TMap = new TreeMap<>(Collections.reverseOrder());
+            
+            ArrayList<Integer> Rank = new ArrayList<Integer>();
+            for(int k = 0; k < 4; k++)
+                Rank.add(k);
+
+            int Size = 4;
+            for(int k = 0; k < 4; k++){
+                try{
+                    int randomIndex = random.nextInt(Size);
+                    int playerIndex = Rank.get(randomIndex);
+                    Rank.remove(randomIndex);
+
+                    BufferedWriter BW = new BufferedWriter(new OutputStreamWriter(ClientSocks[playerIndex].getOutputStream()));
+                    BW.write("Your Turn");
+                    BW.newLine();
+                    BW.flush();
+
+                    BufferedReader BR = new BufferedReader(new InputStreamReader(ClientSocks[playerIndex].getInputStream()));
+                    String message = BR.readLine();
+
+                    if(k == 0)
+                        setChar(message.charAt(message.length() - 1));
+
+                    int score = countScore(message);
+                    TMap.put(score, playerIndex);
+                    Size--;
+
+                    String commonString = message + "\n";
+                    sendString(commonString);
+
+                }catch(IOException e){
+                    e.printStackTrace();
+                }
+            }
+
+            countSubRoundScore(TMap, roundScore);
+
+            String commonString = "Subround " + (j + 1) + " Winner " + ClientUsers[TMap.get(TMap.firstKey())] + "\n";
+            sendString(commonString);
+        }
+    }
+
+    public void startRound(){
+        for(int i = 0; i < 1; i++){
+            sendDeck();
+
+            HashMap<Integer, Integer> commitScore = new HashMap<>();
+            collectCommitScores(commitScore);
+            
+            HashMap<Integer, Integer> roundScore = new HashMap<>();
+            for(int j = 0; j < 4; j++)
+                roundScore.put(j, 0);
+
+            startSubRound(roundScore);
+
+            countRoundScore(roundScore, commitScore, pointsTable);
+        }
+    }
+
+    public void startServer(ServerSocket serverSocket){
         this.serverSocket = serverSocket;
         System.out.println("\nServer started. Waiting for clients to connect...");
 
         try{
-            for (int i = 0; i < 4; i++) {
+            for(int i = 0; i < 4; i++){
                 Socket ClientSock = serverSocket.accept();
 
                 BufferedReader BR = new BufferedReader(new InputStreamReader(ClientSock.getInputStream()));
@@ -246,199 +253,48 @@ class Server {
                 ClientUsers[i] = ClientUser + i;
             }
 
-            System.out.println("\nName of All Players : \n");
+            System.out.println("\nName of All Players : ");
             for(int i = 0; i < 4; i++)
                 System.out.println(ClientUsers[i]);
 
             CommonString = "Other Players\n";
-            SendString(CommonString);
+            sendString(CommonString);
 
-            for (int i = 0; i < 4; i++) {
-                BufferedWriter BF = new BufferedWriter(new OutputStreamWriter(ClientSocks[i].getOutputStream()));
-                for(int j = 0; j < 4; j++){
-                    if(i != j){
-                        BF.write(ClientUsers[j] + "\n");
-                        BF.flush();
-                    }else{
-                        BF.write("Your New Name " + ClientUsers[j] + "\n");
-                        BF.flush();
-                    }
-                }
-            }
+            sendPlayerNames();
 
-            MakeDeck();
-            TrumpCard();
-            PutHashmap();
+            DeckManager DM = new DeckManager();
+            newDeck = DM.prepareDeck();
+
+            Trump = DM.selectTrumpSuit();
+            System.out.println("\nTrump Suit of Game : " + Trump);
+
+            mapRankValues();
 
             CommonString = Trump + "\n";
-            SendString(CommonString);
+            sendString(CommonString);
+            trumpChar = Trump.charAt(0);
 
-            CommonString = "LET'S PLAY \n";
-            SendString(CommonString);
+            CommonString = "Let's Play\n";
+            sendString(CommonString);
 
-            HashMap<Integer, Integer> PointsTable = new HashMap<>();
-            for(int i = 0; i < 4; i++)
-                PointsTable.put(i,0);
+            startRound();
 
-            for(int i = 0; i < 1; i++){
-                String RoundString = "----- Round " + (i + 1) + " -----";
-                System.out.println("\n" + RoundString);
-
-                CommonString = RoundString + "\n";
-                SendString(CommonString);
-                DivideDeck();
-
-                HashMap<Integer, Integer> CommitScore = new HashMap<>();
-                HashMap<Integer, Integer> RoundScore = new HashMap<>();
-                for(int j = 0; j < 4; j++){
-                    CommitScore.put(j,0);
-                    RoundScore.put(j,0);
-                }
-
-                for(int j = 0; j < 4; j++){
-                    try {
-                        ArrayList<String> stringDeck = new ArrayList<>();
-                        for (Card card : MainDeck.get(j)) 
-                            stringDeck.add(card.toString());
-
-                        BufferedWriter BF = new BufferedWriter(new OutputStreamWriter(ClientSocks[j].getOutputStream()));
-                
-                        for (String element : stringDeck) {
-                            BF.write(element);
-                            BF.newLine();
-                            BF.flush();
-                        }          
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-
-                for(int j = 0; j < 4; j++){
-                    BufferedWriter BF = new BufferedWriter(new OutputStreamWriter(ClientSocks[j].getOutputStream()));
-                    BF.write("Your Commit\n");
-                    BF.flush();
-
-                    BufferedReader BR = new BufferedReader(new InputStreamReader(ClientSocks[j].getInputStream()));
-                    int message = Integer.parseInt(BR.readLine());
-                    
-                    CommitScore.put(j, message);
-                }
-
-                for(int j = 0; j < 2; j++){
-                    TreeMap<Integer, Integer> TMap = new TreeMap<>(Collections.reverseOrder());
-                    ArrayList<Integer> Rank = new ArrayList<Integer>();
-
-                    for (int k = 0; k < 4; k++)
-                        Rank.add(k);
-    
-                    int Size = 4;
-
-                    String SubRoundString = "----- Subround " + (j + 1) + " -----";
-                    System.out.println("\n" + SubRoundString);
-
-                    CommonString = SubRoundString + "\n";
-                    SendString(CommonString);
-
-                    for (int k = 0; k < 4; k++){
-                        int R = random.nextInt(Size);
-                        int S = Rank.get(R);
-                        Rank.remove(R);
-    
-                        System.out.println("PLAYER " + ClientUsers[S] + " TURN : ");
-
-                        BufferedWriter BF = new BufferedWriter(new OutputStreamWriter(ClientSocks[S].getOutputStream()));
-                        BF.write("Your Turn\n");
-                        BF.flush();
-
-                        BufferedReader BR = new BufferedReader(new InputStreamReader(ClientSocks[S].getInputStream()));
-                        String message = BR.readLine();
-                        System.out.println(message);
-                        
-                        if(k == 0)
-                            FirstTurn = message.charAt(message.length() - 1);
-                            
-                        Score = CountScore(message, FirstTurn);
-                        
-                        TMap.put(Score,S);
-                        Size--;
-
-                        CommonString = message + "\n";
-                        SendString(CommonString);
-                    }
-
-                    CountSubRoundScore(TMap, RoundScore);
-
-                    CommonString = " Subround " + (j + 1) + " Winner " + ClientUsers[TMap.get(TMap.firstKey())] + " \n";
-                    SendString(CommonString);
-                }
-                
-                CountRoundScore(RoundScore, CommitScore, PointsTable);
-            }
-
-            CommonString = "Game Over\n";
-            SendString(CommonString);
-            
+            CommonString = "Game Over";
+            sendString(CommonString);
         }catch(IOException e){
             e.printStackTrace();
         }
     }
 
-    public static void main(String[] args) {
-        try {
+    public static void main(String[] args){
+        try{
             ServerSocket serverSocket = new ServerSocket(6000);
             Server server = new Server(); 
-            server.StartServer(serverSocket);
+            server.startServer(serverSocket);
             
             serverSocket.close();
-        } catch (IOException e) {
+        }catch(IOException e){
             e.printStackTrace();
         }
     }
 }
-
-// import java.io.*;
-// import java.net.*;
-
-// public class Server {
-//     public static void main(String[] args) {
-//         try {
-//             // Create server socket
-//             ServerSocket serverSocket = new ServerSocket(5000);
-//             System.out.println("Server started. Waiting for clients to connect...");
-
-//             // Array to store client sockets
-//             Socket[] ClientSocks = new Socket[4];
-
-//             // Accept connections from up to 4 clients
-//             for (int i = 0; i < 4; i++) {
-//                 Socket ClientSock = serverSocket.accept();
-//                 System.out.println("Client connected: " + ClientSock);
-//                 ClientSocks[i] = ClientSock;
-//             }
-
-//             // Send a welcome message to each client
-//             for (int i = 0; i < 4; i++) {
-//                 BufferedWriter out = new BufferedWriter(new OutputStreamWriter(ClientSocks[i].getOutputStream()));
-//                 out.write("Welcome, you are client " + (i + 1) + "\n");
-//                 out.flush();
-//             }
-
-//             // Receive a message from each client
-//             for (int i = 0; i < 4; i++) {
-//                 BufferedReader in = new BufferedReader(new InputStreamReader(ClientSocks[i].getInputStream()));
-//                 String message = in.readLine();
-//                 System.out.println("Message from client " + (i + 1) + ": " + message);
-//             }
-
-//             // Close all client sockets
-//             for (Socket socket : ClientSocks) {
-//                 socket.close();
-//             }
-
-//             // Close the server socket
-//             serverSocket.close();
-//         } catch (IOException e) {
-//             e.printStackTrace();
-//         }
-//     }
-// }

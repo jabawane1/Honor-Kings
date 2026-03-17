@@ -2,104 +2,129 @@ import java.util.*;
 import java.net.*;
 import java.io.*;
 
-public class Client {
-    static char T;
-    static HashMap<Character, Integer> HMap = new HashMap<>();
+import java.util.*;
 
-    public static void PutHashmap(){
-        for(int i = 2; i <= 10; i++){
-            char c = (char)(i + 48);
-            HMap.put(c, i);
-        }
+class CardSorter{
+    private char trumpChar;
+    private HashMap<Character, Integer> HMap;
 
-        HMap.put('J',11);
-        HMap.put('Q',12);
-        HMap.put('K',13);
-        HMap.put('A',14);
+    public CardSorter(char trump, HashMap<Character, Integer> map){
+        trumpChar = trump;
+        HMap = map;
     }
 
-    public static int Val(String s){
-        char F = s.charAt(0);
-        char L = s.charAt(s.length()-1);
+    public int countValue(String message){
+        char startChar = message.charAt(0);
 
-        int Score=0;
-        if(s.length() == 4){
-            if(L == T)
-                Score = 110;
+        int score = 0;
+        if(message.length() == 4){
+            if(startChar == trumpChar)
+                score = 110;
             else
-                Score = 10;
+                score = 10;
         }else{
-            if(L == T)
-                Score = 100 + HMap.get(F);
+            if(startChar == trumpChar)
+                score = 100 + HMap.get(startChar);
             else
-                Score = HMap.get(F);
+                score = HMap.get(startChar);
         }
 
-        return Score;
+        return score;
     }
 
-    public static void AddCardsToDeck(TreeMap<Integer, String> cards, ArrayList<String> deck) {
-        for (Integer key : cards.keySet()) 
+    public void addCardsToDeck(TreeMap<Integer, String> cards, ArrayList<String> deck){
+        for(Integer key : cards.keySet())
             deck.add(cards.get(key));
     }
 
-    public static ArrayList<String> Sort(ArrayList<String> Deck){
+    public ArrayList<String> Sort(ArrayList<String> deck){
         TreeMap<Integer,String> C = new TreeMap<>(Collections.reverseOrder());
         TreeMap<Integer,String> D = new TreeMap<>(Collections.reverseOrder());
         TreeMap<Integer,String> H = new TreeMap<>(Collections.reverseOrder());
         TreeMap<Integer,String> S = new TreeMap<>(Collections.reverseOrder());
 
-        for(String s : Deck){
-            char L = s.charAt(s.length()-1);
+        for(String s : deck){
+            char L = s.charAt(s.length() - 1);
             switch (L) {
-                case 'C':
-                    C.put(Val(s),s);
-                    break;
-                case 'D':
-                    D.put(Val(s),s);
-                    break;
-                case 'H':
-                    H.put(Val(s),s);
-                    break;
-                case 'S':
-                    S.put(Val(s),s);
-                    break;
+                case 'C': C.put(countValue(s), s); break;
+                case 'D': D.put(countValue(s), s); break;
+                case 'H': H.put(countValue(s), s); break;
+                case 'S': S.put(countValue(s), s); break;
             }
         }
 
-        ArrayList<String> AnotherDeck = new ArrayList<>();
-        switch (T) {
+        ArrayList<String> anotherDeck = new ArrayList<>();
+
+        switch (trumpChar) {
             case 'C':
-                AddCardsToDeck(C, AnotherDeck);
-                AddCardsToDeck(D, AnotherDeck);
-                AddCardsToDeck(H, AnotherDeck);
-                AddCardsToDeck(S, AnotherDeck);
+                addCardsToDeck(C, anotherDeck);
+                addCardsToDeck(D, anotherDeck);
+                addCardsToDeck(H, anotherDeck);
+                addCardsToDeck(S, anotherDeck);
                 break;
             case 'D':
-                AddCardsToDeck(D, AnotherDeck);
-                AddCardsToDeck(C, AnotherDeck);
-                AddCardsToDeck(H, AnotherDeck);
-                AddCardsToDeck(S, AnotherDeck);
+                addCardsToDeck(D, anotherDeck);
+                addCardsToDeck(C, anotherDeck);
+                addCardsToDeck(H, anotherDeck);
+                addCardsToDeck(S, anotherDeck);
                 break;
             case 'H':
-                AddCardsToDeck(H, AnotherDeck);
-                AddCardsToDeck(C, AnotherDeck);
-                AddCardsToDeck(D, AnotherDeck);
-                AddCardsToDeck(S, AnotherDeck);
+                addCardsToDeck(H, anotherDeck);
+                addCardsToDeck(C, anotherDeck);
+                addCardsToDeck(D, anotherDeck);
+                addCardsToDeck(S, anotherDeck);
                 break;
             case 'S':
-                AddCardsToDeck(S, AnotherDeck);
-                AddCardsToDeck(C, AnotherDeck);
-                AddCardsToDeck(D, AnotherDeck);
-                AddCardsToDeck(H, AnotherDeck);
+                addCardsToDeck(S, anotherDeck);
+                addCardsToDeck(C, anotherDeck);
+                addCardsToDeck(D, anotherDeck);
+                addCardsToDeck(H, anotherDeck);
                 break;
         }
-            
-        return AnotherDeck;
+
+        return anotherDeck;
+    }
+}
+
+public class Client{
+    static CardSorter CS;
+    private static String Message; 
+    private static BufferedReader BR;
+
+    private static char trumpChar;
+    private static HashMap<Character, Integer> HMap = new HashMap<>();
+
+    public static void mapRankValues(){
+        for(int i = 2; i <= 10; i++){
+            char c = (char)(i + 48);
+            HMap.put(c, i);
+        }
+
+        HMap.put('J', 11);
+        HMap.put('Q', 12);
+        HMap.put('K', 13);
+        HMap.put('A', 14);
     }
 
-    public static void main(String[] args) {
-        try {
+    public static void setReader(Socket sock){
+        try{
+            BR = new BufferedReader(new InputStreamReader(sock.getInputStream()));
+        }catch(IOException e){
+            e.printStackTrace();
+        }
+    }
+
+    public static void readAndPrintMessage(){
+        try{
+            Message = BR.readLine();
+            System.out.println("----- " + Message + " -----\n");
+        }catch(IOException e){
+            e.printStackTrace();
+        }
+    }
+
+    public static void main(String[] args){
+        try{
             Scanner scan = new Scanner(System.in);
             
             System.out.println("Enter Your Name : ");
@@ -113,68 +138,58 @@ public class Client {
             Socket sock = new Socket(IP, 6000);
             
             BufferedWriter BF = new BufferedWriter(new OutputStreamWriter(sock.getOutputStream()));
-            BF.write(username + "\n");
+            BF.write(username);
+            BF.newLine();
             BF.flush();
 
-            //Other Players
-            BufferedReader BR = new BufferedReader(new InputStreamReader(sock.getInputStream()));
-            String Message = BR.readLine();
-            System.out.println("----- " + Message + " -----\n");
+            setReader(sock);
+            readAndPrintMessage(); // Other Players
 
-            PutHashmap();
+            mapRankValues();
 
             for(int i = 0; i < 4; i++){
                 Message = BR.readLine();
                 System.out.println(Message);
             }
             
-            //Trump Card of Game - {C,D,H,S}
             Message = BR.readLine();
-            System.out.println("\n----- Trump Card of Game :" + Message + " -----");
-            T = Message.charAt(1);
+            trumpChar = Message.charAt(0);
+            System.out.println("\n----- Trump Suit of Game : " + Message + " -----\n"); // Trump Suit of Game - {C, D, H, S}
 
-            //LET'S PLAY
-            Message = BR.readLine();
-            System.out.println("\n-----" + Message + "-----");
+            CS = new CardSorter(trumpChar, HMap);
+
+            readAndPrintMessage(); // Let's Play
 
             try{
                 for(int i = 0; i < 1; i++){
-                    //Round - i
-                    Message = BR.readLine();
-                    System.out.println("\n-----" + Message + "-----");
-
+                    
+                    System.out.println("----- Round " + (i + 1) + " -----\n"); // SubRound - I
                     ArrayList<String> Deck = new ArrayList<>();
                     for(int j = 0; j < 13; j++){
                         Message = BR.readLine();
                         Deck.add(Message);
                     }
 
-                    Deck = Sort(Deck);
-                    System.out.println("\n" + Deck);
-
-                    //Your Commit
-                    Message = BR.readLine();
-                    System.out.println("\n" + Message);
+                    Deck = CS.Sort(Deck);
+                    System.out.println(Deck + "\n");
+                    
+                    Message = BR.readLine(); // Your Commit
+                    System.out.println(Message);
 
                     int commit = scan.nextInt();
                     BF.write(commit + "\n");
                     BF.flush();
 
                     for(int j = 0; j < 2; j++){
-                        //SubRound - j
-                        Message = BR.readLine();
-                        System.out.println("\n" + Message);
-                        
-                        System.out.println("\n" + Deck);
+                        System.out.println("\n----- SubRound " + (j + 1) + " -----\n"); // SubRound - J
+                        System.out.println(Deck + "\n");
 
                         for(int k = 0; k < 5; k++){
                             Message = BR.readLine();
                             Integer L = Message.length();
                             
+                            System.out.println(Message + "\n"); // Your Turn
                             if(L == 9){
-                                //Your Turn
-                                System.out.println("\n" + Message);
-
                                 int index = scan.nextInt();
                                 String s = Deck.get(index);
 
@@ -182,61 +197,23 @@ public class Client {
             
                                 BF.write(s + "\n");
                                 BF.flush();
-                            }else
-                                System.out.println("\n" + Message);
+                            }
                         }
-
-                        //Winner
-                        Message = BR.readLine();
-                        System.out.println("-----" + Message + "-----\n");
+                        
+                        readAndPrintMessage(); // Winner
                     }
                 }
+                
+                readAndPrintMessage(); // Game Over
 
-                //Game Over
-                Message = BR.readLine();
-                System.out.println("-----" + Message + "-----\n");
-
-                Message = BR.readLine();
-                System.out.println("-----" + Message + "-----\n");
             }catch(IOException e){
                 e.printStackTrace();
             }
 
             sock.close();
             scan.close();
-        } catch (IOException e) {
+        }catch(IOException e){
             e.printStackTrace();
         }
     }
 }
-
-// import java.io.*;
-// import java.net.*;
-
-// public class Client {
-//     public static void main(String[] args) {
-//         try {
-//             // Connect to the server
-//             Socket sock = new Socket("localhost", 5000);
-//             System.out.println("Connected to server");
-
-//             // Get input and output streams
-//             BufferedReader in = new BufferedReader(new InputStreamReader(sock.getInputStream()));
-//             BufferedWriter out = new BufferedWriter(new OutputStreamWriter(sock.getOutputStream()));
-
-//             // Read and print the welcome message from the server
-//             String Message = in.readLine();
-//             System.out.println("Server says: " + Message);
-
-//             // Send a message to the server
-//             out.write("Hello from client\n");
-//             out.flush();
-//             System.out.println("Message sent to server");
-
-//             // Close the sock
-//             sock.close();
-//         } catch (IOException e) {
-//             e.printStackTrace();
-//         }
-//     }
-// }
